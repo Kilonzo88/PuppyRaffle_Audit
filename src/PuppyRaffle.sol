@@ -30,7 +30,7 @@ contract PuppyRaffle is ERC721, Ownable {
     uint64 public totalFees = 0;
 
     // mappings to keep track of token traits
-    mapping(uint256 => uint256) public tokenIdToRarity; //
+    mapping(uint256 => uint256) public tokenIdToRarity; //??
     mapping(uint256 => string) public rarityToUri;
     mapping(uint256 => string) public rarityToName;
 
@@ -73,7 +73,7 @@ contract PuppyRaffle is ERC721, Ownable {
     }
 
     /// @notice this is how players enter the raffle
-    /// @notice they have to pay the entrance fee * the number of players
+    /// @notice they have to pay the entrance fee * the number of players //??
     /// @notice duplicate entrants are not allowed
     /// @param newPlayers the list of players to enter the raffle
     function enterRaffle(address[] memory newPlayers) public payable {
@@ -91,11 +91,12 @@ contract PuppyRaffle is ERC721, Ownable {
         emit RaffleEnter(newPlayers);
     }
 
+
     /// @param playerIndex the index of the player to refund. You can find it externally by calling `getActivePlayerIndex`
     /// @dev This function will allow there to be blank spots in the array
     function refund(uint256 playerIndex) public {
         address playerAddress = players[playerIndex];
-        require(playerAddress == msg.sender, "PuppyRaffle: Only the player can refund");
+        require(playerAddress == msg.sender, "PuppyRaffle: Only the player can refund"); //?? Should get refund. The string message is incorect
         require(playerAddress != address(0), "PuppyRaffle: Player already refunded, or is not active");
 
         payable(msg.sender).sendValue(entranceFee);
@@ -126,7 +127,7 @@ contract PuppyRaffle is ERC721, Ownable {
         require(block.timestamp >= raffleStartTime + raffleDuration, "PuppyRaffle: Raffle not over");
         require(players.length >= 4, "PuppyRaffle: Need at least 4 players");
         uint256 winnerIndex =
-            uint256(keccak256(abi.encodePacked(msg.sender, block.timestamp, block.difficulty))) % players.length;
+            uint256(keccak256(abi.encodePacked(msg.sender, block.timestamp, block.difficulty))) % players.length; //@audit: Weak Randomness
         address winner = players[winnerIndex];
         uint256 totalAmountCollected = players.length * entranceFee;
         uint256 prizePool = (totalAmountCollected * 80) / 100;
@@ -136,7 +137,7 @@ contract PuppyRaffle is ERC721, Ownable {
         uint256 tokenId = totalSupply();
 
         // We use a different RNG calculate from the winnerIndex to determine rarity
-        uint256 rarity = uint256(keccak256(abi.encodePacked(msg.sender, block.difficulty))) % 100;
+        uint256 rarity = uint256(keccak256(abi.encodePacked(msg.sender, block.difficulty))) % 100; //@audit: Weak Randomness
         if (rarity <= COMMON_RARITY) {
             tokenIdToRarity[tokenId] = COMMON_RARITY;
         } else if (rarity <= COMMON_RARITY + RARE_RARITY) {
