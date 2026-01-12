@@ -80,7 +80,7 @@ contract PuppyRaffle is ERC721, Ownable {
         //q: were custom reverts a thing in 0.7.6 compiler version?
         require(msg.value == entranceFee * newPlayers.length, "PuppyRaffle: Must send enough to enter raffle");
         for (uint256 i = 0; i < newPlayers.length; i++) {
-            players.push(newPlayers[i]);
+            players.push(newPlayers[i]); //q: What resets the players array?
         }
 
         // Check for duplicates
@@ -117,8 +117,9 @@ contract PuppyRaffle is ERC721, Ownable {
             }
         }
         return 0;
+        //q: What if a player is at index 0?
+        //@audit: Arrays begin at index 0, were the player at this index to call this function it would be very unclear whether or not they were in the raffle or not
     }
-
     /// @notice this function will select a winner and mint a puppy
     /// @notice there must be at least 4 players, and the duration has occurred
     /// @notice the previous winner is stored in the previousWinner variable
