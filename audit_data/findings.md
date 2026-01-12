@@ -2,6 +2,15 @@
 
 **Description:** The `PuppyRaffle::enterRaffle` function iterates through the `players` array to check for duplicates. However, it performs this check using a nested loop, comparing each player to every other player in the array. This implementation creates a quadratic time complexity O(n^2) relative to the number of players.
 
+``` solidity
+// @audit Dos Attack
+for(uint256 i = 0; i < players.length -1; i++){
+    for(uint256 j = i+1; j< players.length; j++){
+    require(players[i] != players[j],"PuppyRaffle: Duplicate Player");
+  }
+}
+```
+
 **Impact:** The gas costs for entering the raffle will significantly increase as more players join. This is due to the quadratic increase in the number of comparisons required to check for duplicates. Eventually, the gas cost to enter the raffle will exceed the block gas limit, creating a Denial of Service (DoS) vulnerability where no new players can enter the raffle. 
 
 **Proof of Concept:**
