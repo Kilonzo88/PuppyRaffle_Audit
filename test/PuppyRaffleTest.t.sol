@@ -213,4 +213,36 @@ contract PuppyRaffleTest is Test {
         puppyRaffle.withdrawFees();
         assertEq(address(feeAddress).balance, expectedPrizeAmount);
     }
+
+    function testDenialOfServiceEnterRaffle() public {
+
+        vm.txGasPrice(1);
+        uint256 numPlayer =150;
+        address[] memory players = new address[](numPlayer); // Step 1: Creates EMPTY array
+        for (uint256 i = 0; i < numPlayer; i++) {
+            players[i] = address(i); // Step 2: Populate array
+        }
+
+        //Step 3: See how much gas is left for the first batch of players
+        uint256 gasBefore = gasleft();
+        puppyRaffle.enterRaffle{value: entranceFee * numPlayer}(players);
+        uint256 gasAfter = gasleft();
+
+        uint256 gasUsedFirst = (gasBefore - gasAfter) * tx.gasprice;
+        console.log("Gas used to enter raffle for the first batch of 150 players", gasUsedFirst);
+
+        // See how much gas is left for the second batch of players
+        address[] memory playersTwo = new address[](numPlayer); 
+        for (uint256 i = 0; i < numPlayer; i++) {
+            playersTwo[i] = address(i + numPlayer); 
+        }
+        uint256 gasAfterFirstBatch = gasleft();
+        puppyRaffle.enterRaffle{value: entranceFee * numPlayer}(playersTwo);
+        uint256 gasAfterSecondBatch = gasleft();
+
+        uint256 gasUsedSecondBatch = (gasAfterFirstBatch - gasAfterSecondBatch) * tx.gasprice;
+        console.log("Gas used to enter raffle with for the second batch of 150 players", gasUsedSecondBatch);
+
+        assert(gasUsedSecondBatch > gasUsedFirst);
+    }
 }
