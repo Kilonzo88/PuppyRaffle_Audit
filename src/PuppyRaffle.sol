@@ -93,14 +93,15 @@ contract PuppyRaffle is ERC721, Ownable {
         emit RaffleEnter(newPlayers);
     }
 
-
     /// @param playerIndex the index of the player to refund. You can find it externally by calling `getActivePlayerIndex`
     /// @dev This function will allow there to be blank spots in the array
     function refund(uint256 playerIndex) public {
+        //@audit: MEV through front running
         address playerAddress = players[playerIndex];
         require(playerAddress == msg.sender, "PuppyRaffle: Only the player can refund"); //?? Should get refund. The string message is incorect
         require(playerAddress != address(0), "PuppyRaffle: Player already refunded, or is not active");
 
+        //@audit: Reentrancy attack possible here
         payable(msg.sender).sendValue(entranceFee);
 
         players[playerIndex] = address(0);
@@ -120,6 +121,7 @@ contract PuppyRaffle is ERC721, Ownable {
         //q: What if a player is at index 0?
         //@audit: Arrays begin at index 0, were the player at this index to call this function it would be very unclear whether or not they were in the raffle or not
     }
+
     /// @notice this function will select a winner and mint a puppy
     /// @notice there must be at least 4 players, and the duration has occurred
     /// @notice the previous winner is stored in the previousWinner variable
@@ -129,6 +131,8 @@ contract PuppyRaffle is ERC721, Ownable {
     function selectWinner() external {
         require(block.timestamp >= raffleStartTime + raffleDuration, "PuppyRaffle: Raffle not over");
         require(players.length >= 4, "PuppyRaffle: Need at least 4 players");
+
+        
         uint256 winnerIndex =
             uint256(keccak256(abi.encodePacked(msg.sender, block.timestamp, block.difficulty))) % players.length; //@audit: Weak Randomness
         address winner = players[winnerIndex];
