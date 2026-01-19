@@ -241,13 +241,7 @@ contract PuppyRaffleTest is Test {
         assert(gasUsedSecondBatch > gasUsedFirst);
     }
 
-    function test_reentrancyRefund() public {
-        address[] memory players = new address[](4);
-        players[0] = playerOne;
-        players[1] = playerTwo;
-        players[2] = playerThree;
-        players[3] = playerFour;
-        puppyRaffle.enterRaffle{value: entranceFee * 4}(players);
+    function test_reentrancyRefund() public playersEntered {
 
         ReentrancyAttacker attacker = new ReentrancyAttacker(puppyRaffle); 
         address attackUser = makeAddr("attackUser"); 
@@ -267,6 +261,31 @@ contract PuppyRaffleTest is Test {
         console.log("Starting puppy raffle balance", startingPuppyRaffleBalance);
         console.log("Ending puppy raffle balance", endingPuppyRaffleBalance);
 
+    }
+
+    function testTotalFeesOverflow() public playersEntered {
+        // We finish a raffle of 4 to collect some fees
+        vm.warp(block.timestamp + duration + 1);
+        vm.roll(block.number + 1);
+        puppyRaffle.selectWinner();
+        uint256 startingTotalFees = puppyRaffle.totalFees();
+        // startingTotalFees = 800000000000000000
+
+        // We then have a strong raffle with 89 players
+        uint256 playersNum = 89;
+        address[] memory players = new address[](playersNum);
+        for (uint256 i = 0; i < playersNum; i++) {
+            players[i] = address(i);
+        }
+        puppyRaffle.enterRaffle{value: entranceFee * playersNum}(players);
+        
+        vm.warp(block.timestamp + duration + 1);
+        vm.roll(block.number + 1);
+        puppyRaffle.selectWinner();
+
+        uint256 endingTotalFees = puppyRaffle.totalFees();
+        console.log("Ending total fees: ", endingTotalFees);
+        assert(endingTotalFees < startingTotalFees + 20 ether);
     }
 }
 
