@@ -122,5 +122,17 @@ Because these values are predictable or controllable, a malicious actor can calc
 // Research if there are any other ways to manipulate the randomness
 // Research if point 2 is still an issue when we are using chainlink VRF
 **Recommended Mitigation:** 
-1.  **Use a Verifiable Random Function (VRF):** Integrate Chainlink VRF or a similar oracle service to provide provably fair and unpredictable randomness.
-2.  **Harden Randomness:** Avoid using `msg.sender`, `block.timestamp`, or `block.difficulty` as sources of entropy for winning logic.
+**Recommended Mitigation:** 
+Replace the current randomness mechanism with Chainlink VRF (Verifiable Random Function):
+
+1. **Integrate Chainlink VRF v2**: This provides cryptographically secure, provably fair randomness that cannot be predicted or manipulated by validators, miners, or participants.
+
+2. **Remove on-chain entropy sources**: Do not use `msg.sender`, `block.timestamp`, or `block.difficulty/prevrandao` as sources of randomness.
+
+3. **Implementation Pattern**:
+   - Request randomness from Chainlink VRF when raffle duration ends
+   - Store request ID and wait for callback
+   - Use the VRF-provided random number to select winner in the callback function
+   - Ensure proper access controls on the callback function
+
+Note: Chainlink VRF introduces a two-transaction pattern (request + fulfill), so the contract architecture will need to be refactored to accommodate this asynchronous flow.
