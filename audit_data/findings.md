@@ -269,3 +269,82 @@ Alternatively, you can use [OpenZeppelin's ReentrancyGuard](https://docs.openzep
 -   function refund(uint256 playerIndex) public {}
 +   function refund(uint256 playerIndex) public nonReentrant {}
 ```
+
+### [M-#] Integer Overflow of `totalFees` loses fees
+
+**Description:** In `PuppyRaffle::selectWinner`, `totalFees` is defined as a `uint64`. This is an unsafe type casting from `uint256`.
+
+```javascript
+        uint256 fee = (totalAmountCollected * 20) / 100;
+        totalFees = totalFees + uint64(fee);
+```
+
+**Impact:** In Solidity versions prior to `0.8.0`, integers would overflow without reverting. 
+
+1. `fee`:  max value is `18.446744073709551615` ETH. If the `fee` calculated is higher than this value, it will be truncated to a lower value. 
+2. `totalFees`: If the accumulated fees exceed the max value of `uint64`, it will overflow and reset to a lower value.
+
+This results in the protocol thinking it has less fees to withdraw than it actually does, leading to a loss of funds for the protocol owner.
+
+**Proof of Concept:**
+
+1. We have 89 players enter the raffle. Each pays 1 ETH. 
+2. Total Collected: 89 ETH. 
+3. Fee: 17.8 ETH. 
+4. Max `uint64`: ~18.44 ETH. 
+5. `uint64(20 ETH)` will overflow/truncate. 
+
+<details>
+<summary>Proof of Code</summary>
+
+```solidity
+function testTotalFeesOverflow() public playersEntered {
+    // We finish a raffle of 4 to collect some fees
+    vm.warp(block.timestamp + duration + 1);
+    vm.roll(block.number + 1);
+    puppyRaffle.selectWinner();
+    uint256 startingTotalFees = puppyRaffle.totalFees();
+    // startingTotalFees = 800000000000000000
+
+    // We then have a strong raffle with 89 players
+    uint256 playersNum = 89;
+    address[] memory players = new address[](playersNum);
+    for (uint256 i = 0; i < playersNum; i++) {
+        players[i] = address(i);
+    }
+    puppyRaffle.enterRaffle{value: entranceFee * playersNum}(players);
+    
+    vm.warp(block.timestamp + duration + 1);
+    vm.roll(block.number + 1);
+    puppyRaffle.selectWinner();
+
+    uint256 endingTotalFees = puppyRaffle.totalFees();
+    console.log("Ending total fees: ", endingTotalFees);
+    assert(endingTotalFees < startingTotalFees + 20 ether);
+}
+```
+</details> 
+**Recommended Mitigation:** 
+1. Use a newer version of Solidity that does not allow integer overflows by default.
+
+```diff
+- pragma solidity ^0.7.6;
++ pragma solidity ^0.8.18;
+```
+
+Alternatively, if you want to use an older version of Solidity, you can use a library like OpenZeppelin's SafeMath to prevent integer overflows.
+
+2. Use a `uint256` instead of a `uint64` for `totalFees`.
+
+```diff
+- uint64 public totalFees = 0;
++ uint256 public totalFees = 0;
+```
+
+3. Remove the balance check in `PuppyRaffle::withdrawFees`
+
+```diff
+- require(address(this).balance == uint256(totalFees), "PuppyRaffle: There are currently players active!");
+```
+
+We additionally want to bring your attention to another attack vector as a result of this line in a future finding.
