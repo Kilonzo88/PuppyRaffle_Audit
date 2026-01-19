@@ -98,3 +98,29 @@ function testDenialOfService() public {
 ```
 
 3. Alternatively, you could use [OpenZeppelin's EnumerableSet library](https://docs.openzeppelin.com/contracts/5.x/api/utils#EnumerableSet).
+
+### [M-#] Weak Randomness in `PuppyRaffle::selectWinner` allows anyone to choose winner
+
+**Description:** The `PuppyRaffle::selectWinner` function relies on `keccak256(abi.encodePacked(msg.sender, block.timestamp, block.difficulty))` to generate the random winner index. using on-chain values as a randomness seed is a well-known attack vector in blockchain systems. 
+
+- `block.timestamp`: Can be manipulated by miners/validators to some degree.
+- `block.difficulty`: (Now `prevrandao` in Merge) Can be known or influenced.
+- `msg.sender`: The caller controls this address.
+
+Because these values are predictable or controllable, a malicious actor can calculate the result of the "random" number generation *before* forcing the transaction to be mined. This allows them to ensure they only call `selectWinner` when the result is favorable to them, or to front-run the transaction if they see a losing result.
+
+**Impact:** 
+1. **Winner Manipulation:** Attackers can ensure they win the raffle.
+2. **Risk-Free Lottery:** By calculating the winner index off-chain or via simulation, an attacker can determine if they will lose. If so, they can call `refund` (as described in other logic) or simply choose not to participate/call the function, effectively giving them a risk-free shot at the prize.
+3. **Denial of Service:** As a side effect, the "risk-free" refund mechanism described elsewhere relies on this predictability.
+
+**Proof of Concept:**
+1. Validators can know ahead of time what the `block.timestamp` and `block.difficulty` will be and use that to predict when/how to participate. See the [solidity blog on prevrandao](https://soliditydeveloper.com/prevrandao). `block.difficulty` was recently replaced with prevrandao.
+2. User mines/manipulates their own block, and only includes their transaction if the resulting `preevrandao` (or difficulty) and `timestamp` produces a hash that lets them win. 
+3. This allows a validator to guarantee they win the raffle.
+
+// Research if there are any other ways to manipulate the randomness
+// Research if point 2 is still an issue when we are using chainlink VRF
+**Recommended Mitigation:** 
+1.  **Use a Verifiable Random Function (VRF):** Integrate Chainlink VRF or a similar oracle service to provide provably fair and unpredictable randomness.
+2.  **Harden Randomness:** Avoid using `msg.sender`, `block.timestamp`, or `block.difficulty` as sources of entropy for winning logic.
