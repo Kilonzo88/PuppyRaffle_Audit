@@ -121,7 +121,7 @@ Because these values are predictable or controllable, a malicious actor can calc
 
 // Research if there are any other ways to manipulate the randomness
 // Research if point 2 is still an issue when we are using chainlink VRF
-**Recommended Mitigation:** 
+
 **Recommended Mitigation:** 
 Replace the current randomness mechanism with Chainlink VRF (Verifiable Random Function):
 
