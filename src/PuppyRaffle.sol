@@ -139,7 +139,7 @@ contract PuppyRaffle is ERC721, Ownable {
         uint256 totalAmountCollected = players.length * entranceFee;
         uint256 prizePool = (totalAmountCollected * 80) / 100;
         uint256 fee = (totalAmountCollected * 20) / 100;
-        //@Audit: overflow possible here
+        //@adit: overflow possible here
         totalFees = totalFees + uint64(fee);
         //q: where do we increment the total supply in cases of new entrants
         uint256 tokenId = totalSupply(); 
@@ -155,11 +155,12 @@ contract PuppyRaffle is ERC721, Ownable {
             tokenIdToRarity[tokenId] = LEGENDARY_RARITY;
         }
 
-        delete players; //resetting the players array
+        delete players; //e resetting the players array
         raffleStartTime = block.timestamp; //resetting the raffle start time
         previousWinner = winner; //setting the previous winner
 
         //@audit: Reentrancy attack possible here
+        //q What if the winner is a contract with a messed up fallback
         (bool success,) = winner.call{value: prizePool}("");
         require(success, "PuppyRaffle: Failed to send prize pool to winner");
         _safeMint(winner, tokenId);
@@ -167,9 +168,13 @@ contract PuppyRaffle is ERC721, Ownable {
 
     /// @notice this function will withdraw the fees to the feeAddress
     function withdrawFees() external {
+        // @audit is it difficult to withdraw fees?
+        //@audit mishandling ETH
         require(address(this).balance == uint256(totalFees), "PuppyRaffle: There are currently players active!");
         uint256 feesToWithdraw = totalFees;
         totalFees = 0;
+
+        //q What if the feeAddress is a contract with a messed up fallback?
         (bool success,) = feeAddress.call{value: feesToWithdraw}("");
         require(success, "PuppyRaffle: Failed to withdraw fees");
     }
