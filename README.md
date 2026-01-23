@@ -4,6 +4,14 @@
 
 # Puppy Raffle
 
+> **⚠️ AUDIT NOTICE**  
+> This codebase has been audited. The unaudited version exists prior to the merge from the `audit_data` branch into `master` (commit history preserved).  
+> 
+> **Audit Report**: See [`audit_data/report.pdf`](./audit_data/report.pdf) for the full security audit report.  
+> **Findings**: See [`audit_data/findings.md`](./audit_data/findings.md) for detailed vulnerability findings.
+>
+> **Status**: This codebase contains known vulnerabilities identified during the audit process. This is an educational project demonstrating common smart contract security issues. **DO NOT use in production.**
+
 This project is to enter a raffle to win a cute dog NFT. The protocol should do the following:
 
 1. Call the `enterRaffle` function with the following parameters:
