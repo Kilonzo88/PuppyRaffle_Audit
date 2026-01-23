@@ -1,0 +1,12 @@
+{
+  "solidity.packageDefaultDependenciesDirectory": "lib",
+  "solidity.packageDefaultDependenciesContractsDirectory": "",
+  "solidity.remappings": [
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "base64/=lib/base64/",
+    "forge-std/=lib/forge-std/src/",
+    "lib/=lib/"
+  ],
+  "solidity.compileUsingRemoteVersion": "v0.7.6+commit.3b7d8b1f",
+  "solidity.enabledForWorkspace": true
+}
