@@ -287,6 +287,15 @@ contract PuppyRaffleTest is Test {
         console.log("Ending total fees: ", endingTotalFees);
         assert(endingTotalFees < startingTotalFees + 20 ether);
     }
+
+    function testCantSendMoneyToRaffle() public {
+        address sendAddy = makeAddr("sender");
+        vm.deal(sendAddy, 1 ether);
+        vm.expectRevert();
+        vm.prank(sendAddy);
+        (bool success, ) = payable(address(puppyRaffle)).call{value: 1 ether}("");
+        require(success);
+    }
 }
 
 contract ReentrancyAttacker {
